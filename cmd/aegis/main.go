@@ -17,19 +17,11 @@ func main() {
 
 	proxyHandler := proxy.New(cfg.UpstreamURL)
 
-	server := gateway.New(
-		cfg.ListenAddr,
-		proxyHandler,
-	)
+	server := gateway.New(cfg.ListenAddr, proxyHandler)
 
-	log.Printf(
-		"Aegis listening on %s, upstream=%s",
-		cfg.ListenAddr,
-		cfg.UpstreamURL,
-	)
+	log.Printf("Aegis listening on %s, upstream=%s", cfg.ListenAddr, cfg.UpstreamURL)
 
-	if err := server.Start(); err != nil &&
-		err != http.ErrServerClosed {
+	if err := server.Start(); err != nil && err != http.ErrServerClosed {
 		log.Fatalf("server error: %v", err)
 	}
 }
