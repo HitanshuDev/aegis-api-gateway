@@ -15,6 +15,8 @@ func New(target *url.URL) http.Handler {
 			// Explicitly set the outgoing Host header to match the upstream target host
 			pr.Out.Host = target.Host
 
+			pr.Out.Header.Set("X-Request-ID", pr.In.Header.Get("X-Request-ID"))
+
 			pr.SetXForwarded()
 		},
 		ErrorHandler: func(w http.ResponseWriter, r *http.Request, err error) {
