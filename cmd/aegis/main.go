@@ -8,8 +8,6 @@ import (
 
 	"github.com/HitanshuDev/aegis-api-gateway/internal/config"
 	"github.com/HitanshuDev/aegis-api-gateway/internal/gateway"
-	"github.com/HitanshuDev/aegis-api-gateway/internal/middleware"
-	"github.com/HitanshuDev/aegis-api-gateway/internal/proxy"
 )
 
 func main() {
@@ -20,11 +18,7 @@ func main() {
 
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 
-	proxyHandler := proxy.New(cfg.UpstreamURL)
-
-	handler := middleware.AccessLog(logger, cfg.UpstreamURL.Host, proxyHandler)
-
-	handler = middleware.RequestID(handler)
+	handler := newHandler(cfg, logger)
 
 	server := gateway.New(cfg.ListenAddr, handler)
 
