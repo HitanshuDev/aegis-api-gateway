@@ -14,12 +14,9 @@ func TestAccessLogRedactsSensitiveData(t *testing.T) {
 
 	logger := slog.New(slog.NewJSONHandler(&logs, nil))
 
-	upstream := "localhost:9000"
-
 	handler := RequestID(
 		AccessLog(
 			logger,
-			upstream,
 			http.HandlerFunc(func(
 				w http.ResponseWriter,
 				r *http.Request,
@@ -62,7 +59,6 @@ func TestAccessLogRedactsSensitiveData(t *testing.T) {
 		`"method":"POST"`,
 		`"route":"/users"`,
 		`"status":200`,
-		`"upstream":"localhost:9000"`,
 		`"request_id"`,
 		`"duration_ms"`,
 	}

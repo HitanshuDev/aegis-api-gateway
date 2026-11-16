@@ -27,7 +27,7 @@ func newHandler(cfg config.Config, logger *slog.Logger, health *healthState) htt
 	mux.HandleFunc("GET /health/ready", health.readiness)
 
 	handler := http.Handler(mux)
-	handler = middleware.AccessLog(logger, "configured routes", handler)
+	handler = middleware.AccessLog(logger, handler)
 	return middleware.RequestID(handler)
 }
 
