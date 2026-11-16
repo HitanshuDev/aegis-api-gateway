@@ -1,0 +1,18 @@
+listen_addr: ":8080"
+
+timeouts:
+  read: 15s
+  read_header: 5s
+  write: 30s
+  idle: 60s
+  shutdown: 30s
+
+upstreams:
+  users: "http://localhost:9001"
+  orders: "http://localhost:9002"
+
+routes:
+  - prefix: /users
+    upstream: users
+  - prefix: /orders
+    upstream: orders
