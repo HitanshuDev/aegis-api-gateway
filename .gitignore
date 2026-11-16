@@ -1,0 +1,58 @@
+
+# -------------------------
+# Environment variables / secrets
+# -------------------------
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+credentials/
+
+# -------------------------
+# Go binaries and build files
+# -------------------------
+/aegis-api-gateway
+*.exe
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+/build/
+/dist/
+
+# -------------------------
+# Go workspace files
+# -------------------------
+go.work
+go.work.sum
+
+# -------------------------
+# IDEs and editors
+# -------------------------
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# -------------------------
+# OS-generated files
+# -------------------------
+.DS_Store
+Thumbs.db
+
+# -------------------------
+# Logs and temporary files
+# -------------------------
+*.log
+tmp/
+temp/
+
+# -------------------------
+# Test / coverage output
+# -------------------------
+coverage.out
+coverage.html
