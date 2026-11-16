@@ -25,6 +25,16 @@ Run the gateway:
 make run
 ```
 
+The gateway reads all application settings from `config.yaml`. To use another YAML file:
+
+```bash
+go run ./cmd/aegis -config path/to/config.yaml
+```
+
+See [config.yaml](./config.yaml) for a complete example. The YAML file is the sole source of application configuration; environment variables are not used.
+
+Routes are matched by path-segment prefix. When multiple routes match, the longest prefix wins, regardless of YAML order. The matched prefix is preserved in the path sent upstream. Requests that match no route return `404 Not Found`.
+
 Run tests:
 
 ```bash
@@ -47,19 +57,11 @@ make build
 
 - `GET /health/live` returns `200 OK` while the process is running.
 - `GET /health/ready` returns `200 OK` while the gateway is accepting traffic and `503 Service Unavailable` after shutdown begins.
-- Other methods to these health endpoints return `405 Method Not Allowed`.
+- Health handlers are registered for GET; other methods follow the normal configured route matching rules.
 
 The gateway handles `SIGINT` and `SIGTERM` by marking itself unready, stopping acceptance of new connections, and draining active requests for up to the configured shutdown timeout. If the deadline expires, remaining connections are closed.
 
-Durations use Go duration syntax (for example, `15s` or `2m`). The following environment variables are configurable and must be greater than zero:
-
-| Variable | Default |
-| --- | --- |
-| `AEGIS_READ_TIMEOUT` | `15s` |
-| `AEGIS_READ_HEADER_TIMEOUT` | `5s` |
-| `AEGIS_WRITE_TIMEOUT` | `30s` |
-| `AEGIS_IDLE_TIMEOUT` | `60s` |
-| `AEGIS_SHUTDOWN_TIMEOUT` | `30s` |
+Durations in `config.yaml` use Go duration syntax (for example, `15s` or `2m`) and must be greater than zero.
 
 Read and write timeouts apply to the entire request/response, so tune them for the gateway's upload, response, and streaming workloads.
 

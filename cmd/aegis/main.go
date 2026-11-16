@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"log"
 	"log/slog"
 	"net/http"
@@ -49,7 +50,10 @@ func run(server *gateway.Server, health *healthState, shutdownTimeout time.Durat
 }
 
 func main() {
-	cfg, err := config.Load()
+	configPath := flag.String("config", "config.yaml", "path to YAML configuration file")
+	flag.Parse()
+
+	cfg, err := config.Load(*configPath)
 	if err != nil {
 		log.Fatalf("configuration error: %v", err)
 	}
@@ -66,7 +70,7 @@ func main() {
 		Idle:       cfg.IdleTimeout,
 	})
 
-	log.Printf("Aegis listening on %s, upstream=%s", cfg.ListenAddr, cfg.UpstreamURL)
+	log.Printf("Aegis listening on %s, configured routes=%d", cfg.ListenAddr, len(cfg.Routes))
 
 	signals := make(chan os.Signal, 1)
 

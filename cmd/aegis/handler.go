@@ -22,12 +22,12 @@ func newHealthState() *healthState {
 
 func newHandler(cfg config.Config, logger *slog.Logger, health *healthState) http.Handler {
 	mux := http.NewServeMux()
-	mux.Handle("/", proxy.New(cfg.UpstreamURL))
+	mux.Handle("/", proxy.NewRouter(cfg.Upstreams, cfg.Routes))
 	mux.HandleFunc("GET /health/live", health.liveness)
 	mux.HandleFunc("GET /health/ready", health.readiness)
 
 	handler := http.Handler(mux)
-	handler = middleware.AccessLog(logger, cfg.UpstreamURL.Host, handler)
+	handler = middleware.AccessLog(logger, handler)
 	return middleware.RequestID(handler)
 }
 

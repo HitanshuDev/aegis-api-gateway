@@ -19,7 +19,10 @@ func TestHealthEndpoints(t *testing.T) {
 
 	health := newHealthState()
 	handler := newHandler(
-		config.Config{UpstreamURL: upstream},
+		config.Config{
+			Upstreams: map[string]*url.URL{"default": upstream},
+			Routes:    []config.Route{{Prefix: "/", Upstream: "default"}},
+		},
 		slog.New(slog.NewTextHandler(io.Discard, nil)),
 		health,
 	)

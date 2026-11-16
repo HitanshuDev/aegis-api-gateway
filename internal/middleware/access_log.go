@@ -42,20 +42,11 @@ func (w *statusWriter) Flush() {
 	_ = http.NewResponseController(w.ResponseWriter).Flush()
 }
 
-func AccessLog(
-	logger *slog.Logger,
-	upstream string,
-	next http.Handler,
-) http.Handler {
-	return http.HandlerFunc(func(
-		w http.ResponseWriter,
-		r *http.Request,
-	) {
+func AccessLog(logger *slog.Logger, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 
-		wrapped := &statusWriter{
-			ResponseWriter: w,
-		}
+		wrapped := &statusWriter{ResponseWriter: w}
 
 		defer func() {
 			duration := time.Since(start)
@@ -72,7 +63,6 @@ func AccessLog(
 				"route", r.URL.Path,
 				"status", wrapped.status,
 				"duration_ms", duration.Milliseconds(),
-				"upstream", upstream,
 			)
 		}()
 

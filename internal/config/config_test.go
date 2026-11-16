@@ -1,86 +1,134 @@
 package config
 
 import (
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
 
-func TestLoadTimeoutDefaults(t *testing.T) {
-	setBaseEnvironment(t)
+const validYAML = `listen_addr: ":8080"
+timeouts:
+  read: 15s
+  read_header: 5s
+  write: 30s
+  idle: 60s
+  shutdown: 10s
+upstreams:
+  users: http://localhost:9001
+  orders: http://localhost:9002
+routes:
+  - prefix: /users
+    upstream: users
+  - prefix: /orders
+    upstream: orders
+`
 
-	cfg, err := Load()
-	if err != nil {
+func TestLoadYAMLConfiguration(t *testing.T) {
+	cfg := loadConfigText(t, validYAML)
+
+	if cfg.ListenAddr != ":8080" {
+		t.Errorf("ListenAddr = %q, want %q", cfg.ListenAddr, ":8080")
+	}
+	if cfg.ReadTimeout != 15*time.Second ||
+		cfg.ReadHeaderTimeout != 5*time.Second ||
+		cfg.WriteTimeout != 30*time.Second ||
+		cfg.IdleTimeout != 60*time.Second ||
+		cfg.ShutdownTimeout != 10*time.Second {
+		t.Errorf("unexpected timeout values: %+v", cfg)
+	}
+	if len(cfg.Upstreams) != 2 || len(cfg.Routes) != 2 {
+		t.Fatalf("got %d upstreams and %d routes, want 2 of each",
+			len(cfg.Upstreams), len(cfg.Routes))
+	}
+	if got := cfg.Upstreams["users"].String(); got != "http://localhost:9001" {
+		t.Errorf("users upstream = %q", got)
+	}
+}
+
+func TestExampleYAMLConfigurationLoads(t *testing.T) {
+	if _, err := Load(filepath.Join("..", "..", "config.yaml")); err != nil {
 		t.Fatal(err)
 	}
+}
 
-	got := []time.Duration{
-		cfg.ReadTimeout,
-		cfg.ReadHeaderTimeout,
-		cfg.WriteTimeout,
-		cfg.IdleTimeout,
-		cfg.ShutdownTimeout,
+func TestLoadRejectsInvalidConfiguration(t *testing.T) {
+	tests := []struct {
+		name        string
+		yaml        string
+		wantMessage string
+	}{
+		{
+			name:        "invalid upstream URL",
+			yaml:        strings.Replace(validYAML, "http://localhost:9001", "ftp://localhost:9001", 1),
+			wantMessage: "upstreams.users must be an absolute HTTP or HTTPS URL",
+		},
+		{
+			name:        "duplicate prefix",
+			yaml:        strings.Replace(validYAML, "  - prefix: /orders", "  - prefix: /users", 1),
+			wantMessage: `duplicate route prefix "/users"`,
+		},
+		{
+			name:        "unknown upstream",
+			yaml:        strings.Replace(validYAML, "upstream: orders", "upstream: missing", 1),
+			wantMessage: `references undefined upstream "missing"`,
+		},
+		{
+			name:        "noncanonical prefix",
+			yaml:        strings.Replace(validYAML, "prefix: /users", "prefix: /users/", 1),
+			wantMessage: "must be a canonical absolute path prefix",
+		},
+		{
+			name:        "invalid timeout",
+			yaml:        strings.Replace(validYAML, "read: 15s", "read: sometime", 1),
+			wantMessage: "invalid timeouts.read",
+		},
+		{
+			name:        "unknown field",
+			yaml:        strings.Replace(validYAML, "listen_addr:", "listen_address:", 1),
+			wantMessage: "field listen_address not found",
+		},
 	}
-	want := []time.Duration{
-		15 * time.Second,
-		5 * time.Second,
-		30 * time.Second,
-		60 * time.Second,
-		30 * time.Second,
-	}
-	for i := range want {
-		if got[i] != want[i] {
-			t.Errorf("timeout %d = %s, want %s", i, got[i], want[i])
-		}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := loadConfigTextWithError(t, tt.yaml)
+			if err == nil {
+				t.Fatal("Load() accepted invalid configuration")
+			}
+			if !strings.Contains(err.Error(), tt.wantMessage) {
+				t.Fatalf("Load() error = %q, want it to contain %q", err, tt.wantMessage)
+			}
+		})
 	}
 }
 
-func TestLoadTimeoutOverrides(t *testing.T) {
-	setBaseEnvironment(t)
-	t.Setenv("AEGIS_READ_TIMEOUT", "2s")
-	t.Setenv("AEGIS_READ_HEADER_TIMEOUT", "3s")
-	t.Setenv("AEGIS_WRITE_TIMEOUT", "4s")
-	t.Setenv("AEGIS_IDLE_TIMEOUT", "5s")
-	t.Setenv("AEGIS_SHUTDOWN_TIMEOUT", "6s")
-
-	cfg, err := Load()
-	if err != nil {
-		t.Fatal(err)
+func TestLoadMissingFileIncludesPath(t *testing.T) {
+	filename := filepath.Join(t.TempDir(), "missing.yaml")
+	_, err := Load(filename)
+	if err == nil {
+		t.Fatal("Load() accepted a missing file")
 	}
-
-	if cfg.ReadTimeout != 2*time.Second ||
-		cfg.ReadHeaderTimeout != 3*time.Second ||
-		cfg.WriteTimeout != 4*time.Second ||
-		cfg.IdleTimeout != 5*time.Second ||
-		cfg.ShutdownTimeout != 6*time.Second {
-		t.Fatalf("unexpected timeout configuration: %+v", cfg)
+	if !strings.Contains(err.Error(), filename) {
+		t.Errorf("error %q does not identify filename %q", err, filename)
 	}
 }
 
-func TestLoadRejectsInvalidTimeout(t *testing.T) {
-	setBaseEnvironment(t)
-	t.Setenv("AEGIS_WRITE_TIMEOUT", "not-a-duration")
-
-	if _, err := Load(); err == nil {
-		t.Fatal("Load() accepted an invalid timeout")
-	}
-}
-
-func TestLoadRejectsNonPositiveTimeout(t *testing.T) {
-	setBaseEnvironment(t)
-	t.Setenv("AEGIS_SHUTDOWN_TIMEOUT", "0s")
-
-	if _, err := Load(); err == nil {
-		t.Fatal("Load() accepted a zero shutdown timeout")
-	}
-}
-
-func setBaseEnvironment(t *testing.T) {
+func loadConfigText(t *testing.T, text string) Config {
 	t.Helper()
-	t.Setenv("AEGIS_LISTEN_ADDR", ":8080")
-	t.Setenv("AEGIS_UPSTREAM_URL", "http://localhost:9000")
-	t.Setenv("AEGIS_READ_TIMEOUT", "")
-	t.Setenv("AEGIS_READ_HEADER_TIMEOUT", "")
-	t.Setenv("AEGIS_WRITE_TIMEOUT", "")
-	t.Setenv("AEGIS_IDLE_TIMEOUT", "")
-	t.Setenv("AEGIS_SHUTDOWN_TIMEOUT", "")
+	cfg, err := loadConfigTextWithError(t, text)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return cfg
+}
+
+func loadConfigTextWithError(t *testing.T, text string) (Config, error) {
+	t.Helper()
+	filename := filepath.Join(t.TempDir(), "config.yaml")
+	if err := os.WriteFile(filename, []byte(text), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return Load(filename)
 }

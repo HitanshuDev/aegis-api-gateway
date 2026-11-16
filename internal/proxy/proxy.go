@@ -5,6 +5,10 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"sort"
+	"strings"
+
+	"github.com/HitanshuDev/aegis-api-gateway/internal/config"
 )
 
 func New(target *url.URL) http.Handler {
@@ -27,4 +31,35 @@ func New(target *url.URL) http.Handler {
 	}
 
 	return proxy
+}
+
+func NewRouter(upstreams map[string]*url.URL, routes []config.Route) http.Handler {
+	type routedProxy struct {
+		prefix  string
+		handler http.Handler
+	}
+
+	orderedRoutes := append([]config.Route(nil), routes...)
+	sort.Slice(orderedRoutes, func(i, j int) bool {
+		return len(orderedRoutes[i].Prefix) > len(orderedRoutes[j].Prefix)
+	})
+
+	proxies := make([]routedProxy, 0, len(orderedRoutes))
+	for _, route := range orderedRoutes {
+		proxies = append(proxies, routedProxy{
+			prefix:  route.Prefix,
+			handler: New(upstreams[route.Upstream]),
+		})
+	}
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		for _, route := range proxies {
+			if route.prefix == "/" || r.URL.Path == route.prefix || strings.HasPrefix(r.URL.Path, route.prefix+"/") {
+				route.handler.ServeHTTP(w, r)
+				return
+			}
+		}
+
+		http.NotFound(w, r)
+	})
 }
