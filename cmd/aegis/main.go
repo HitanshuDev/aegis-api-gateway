@@ -14,12 +14,7 @@ import (
 	"github.com/HitanshuDev/aegis-api-gateway/internal/gateway"
 )
 
-func run(
-	server *gateway.Server,
-	health *healthState,
-	shutdownTimeout time.Duration,
-	signals <-chan os.Signal,
-) error {
+func run(server *gateway.Server, health *healthState, shutdownTimeout time.Duration, signals <-chan os.Signal) error {
 	serverErrors := make(chan error, 1)
 
 	go func() {
@@ -36,10 +31,7 @@ func run(
 	case <-signals:
 		health.ready.Store(false)
 
-		ctx, cancel := context.WithTimeout(
-			context.Background(),
-			shutdownTimeout,
-		)
+		ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 		defer cancel()
 
 		if err := server.Shutdown(ctx); err != nil {
